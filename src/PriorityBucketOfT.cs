@@ -57,8 +57,7 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
         if (_items.Count > 0)
         {
             item = _bucketOrder.Apply(_items).First();
-            _items.Remove(item);
-            _version++;
+            RemoveDequeuedItem(item);
             return true;
         }
 
@@ -108,6 +107,20 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
         {
             throw new InvalidOperationException("The bucket was modified during enumeration.");
         }
+    }
+
+    private void RemoveDequeuedItem(T item)
+    {
+        var index = _items.FindIndex(candidate => ReferenceEquals(candidate, item));
+        if (index < 0)
+        {
+            index = _items.FindIndex(candidate => EqualityComparer<T>.Default.Equals(candidate, item));
+        }
+
+        if (index < 0) { return; }
+
+        _items.RemoveAt(index);
+        _version++;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

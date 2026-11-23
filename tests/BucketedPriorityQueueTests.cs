@@ -226,6 +226,18 @@ public class BucketedPriorityQueueTests
     }
 
     [Fact]
+    public void Bucket_and_queue_removal_use_default_equality_and_return_false_when_missing()
+    {
+        var bucket = new PriorityBucket<QueueValue> { new(7, 0) };
+        var sut = new BucketedPriorityQueue<QueueValue> { bucket };
+
+        bucket.Contains(new QueueValue(7, 0)).Should().BeTrue();
+        bucket.Remove(new QueueValue(8, 0)).Should().BeFalse();
+        sut.Remove(new QueueValue(7, 0)).Should().BeTrue();
+        sut.Remove(new QueueValue(7, 0)).Should().BeFalse();
+    }
+
+    [Fact]
     public void Adding_a_bucket_invalidates_an_existing_enumerator_before_iteration()
     {
         var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1 } };
@@ -360,5 +372,55 @@ public class BucketedPriorityQueueTests
         var act = () => enumerator.MoveNext();
 
         act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Key_based_ordering_preserves_enqueue_order_for_equal_keys()
+    {
+        var bucket = new PriorityBucket<(int Priority, string Name)>(
+            Ordering<(int Priority, string Name)>.By(item => item.Priority))
+        {
+            (2, "first"),
+            (1, "middle"),
+            (2, "second")
+        };
+        var sut = new BucketedPriorityQueue<(int Priority, string Name)> { bucket };
+
+        sut.Should().BeEquivalentTo(
+            new[] { (1, "middle"), (2, "first"), (2, "second") },
+            opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Dequeue_removes_the_exact_item_selected_by_custom_ordering_when_items_compare_equal()
+    {
+        var firstAdded = new QueueValue(7, 2);
+        var orderedFirst = new QueueValue(7, 1);
+        var bucket = new PriorityBucket<QueueValue>(Ordering<QueueValue>.By(item => item.Priority))
+        {
+            firstAdded,
+            orderedFirst
+        };
+        var sut = new BucketedPriorityQueue<QueueValue> { bucket };
+
+        sut.Dequeue().Should().BeSameAs(orderedFirst);
+
+        sut.Should().ContainSingle().Which.Should().BeSameAs(firstAdded);
+    }
+
+    private sealed class QueueValue
+    {
+        public QueueValue(int id, int priority)
+        {
+            Id = id;
+            Priority = priority;
+        }
+
+        public int Id { get; }
+        public int Priority { get; }
+
+        public override bool Equals(object? obj) => obj is QueueValue other && Id == other.Id;
+
+        public override int GetHashCode() => Id.GetHashCode();
     }
 }
