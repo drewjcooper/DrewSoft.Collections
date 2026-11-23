@@ -171,11 +171,11 @@ public class BucketedPriorityQueueTests
     {
         var sut = new BucketedPriorityQueue<int>();
 
-        new { sut.Count, sut.IsEmpty }.Should().BeEquivalentTo(new { Count = 0, IsEmpty = true });
+        ((object)sut).Should().BeEquivalentTo(new { Count = 0, IsEmpty = true });
 
         sut.Add(new PriorityBucket<int> { 1, 2 });
 
-        new { sut.Count, sut.IsEmpty }.Should().BeEquivalentTo(new { Count = 2, IsEmpty = false });
+        ((object)sut).Should().BeEquivalentTo(new { Count = 2, IsEmpty = false });
     }
 
     [Fact]
