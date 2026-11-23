@@ -165,4 +165,63 @@ public class BucketedPriorityQueueTests
         result.Should().BeTrue();
         item.Should().Be(1);
     }
+
+    [Fact]
+    public void Queues_expose_total_count_and_empty_state()
+    {
+        var sut = new BucketedPriorityQueue<int>();
+
+        new { sut.Count, sut.IsEmpty }.Should().BeEquivalentTo(new { Count = 0, IsEmpty = true });
+
+        sut.Add(new PriorityBucket<int> { 1, 2 });
+
+        new { sut.Count, sut.IsEmpty }.Should().BeEquivalentTo(new { Count = 2, IsEmpty = false });
+    }
+
+    [Fact]
+    public void Peek_returns_the_next_item_without_removing_it()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+
+        var result = sut.Peek();
+
+        result.Should().Be(1);
+        sut.Count.Should().Be(2);
+        sut.Dequeue().Should().Be(1);
+    }
+
+    [Fact]
+    public void TryPeek_returns_the_next_item_without_removing_it()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+
+        var result = sut.TryPeek(out var item);
+
+        result.Should().BeTrue();
+        item.Should().Be(1);
+        sut.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Removing_an_item_from_a_bucket_updates_its_count_and_contents()
+    {
+        var sut = new PriorityBucket<int> { 1, 2, 3 };
+
+        var result = sut.Remove(2);
+
+        result.Should().BeTrue();
+        sut.Should().BeEquivalentTo(new[] { 1, 3 }, opts => opts.WithStrictOrdering());
+        sut.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Clearing_a_bucket_removes_all_items()
+    {
+        var sut = new PriorityBucket<int> { 1, 2, 3 };
+
+        sut.Clear();
+
+        sut.Should().BeEmpty();
+        sut.Count.Should().Be(0);
+    }
 }

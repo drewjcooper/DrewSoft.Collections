@@ -11,9 +11,26 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
 
     public int Count => _items.Count;
 
-    public bool IsReadOnly => throw new NotImplementedException();
+    public bool IsReadOnly => false;
 
     public void Add(T item) => _items.Add(item);
+
+    public T Peek()
+        => TryPeek(out var item)
+            ? item
+            : throw new InvalidOperationException("Cannot peek at an item from an empty bucket.");
+
+    public bool TryPeek([NotNullWhen(true)] out T? item)
+    {
+        if (_items.Count > 0)
+        {
+            item = _bucketOrder.Apply(_items).First();
+            return true;
+        }
+
+        item = default;
+        return false;
+    }
 
     internal bool TryDequeue([NotNullWhen(true)] out T? item)
     {
@@ -28,25 +45,13 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
         return false;
     }
 
-    public void Clear()
-    {
-        throw new NotImplementedException();
-    }
+    public void Clear() => _items.Clear();
 
-    public bool Contains(T item)
-    {
-        throw new NotImplementedException();
-    }
+    public bool Contains(T item) => _items.Contains(item);
 
-    public void CopyTo(T[] array, int arrayIndex)
-    {
-        throw new NotImplementedException();
-    }
+    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
 
-    public bool Remove(T item)
-    {
-        throw new NotImplementedException();
-    }
+    public bool Remove(T item) => _items.Remove(item);
 
     public IEnumerator<T> GetEnumerator() => _bucketOrder.Apply(_items).GetEnumerator();
 

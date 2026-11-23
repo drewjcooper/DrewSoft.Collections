@@ -13,6 +13,8 @@ public class BucketedPriorityQueue<T> : IEnumerable<T>
     public BucketedPriorityQueue(IEnumerable<PriorityBucket<T>> buckets) => _buckets = [..buckets];
 
     public IEnumerable<PriorityBucket<T>> Buckets => _buckets.AsReadOnly();
+    public int Count => _buckets.Sum(bucket => bucket.Count);
+    public bool IsEmpty => Count == 0;
 
     public void Add(PriorityBucket<T> bucket) => _buckets.Add(bucket);
 
@@ -26,6 +28,22 @@ public class BucketedPriorityQueue<T> : IEnumerable<T>
         {
             _buckets.Add(bucket);
         }
+    }
+
+    public T Peek()
+        => TryPeek(out var item)
+            ? item
+            : throw new InvalidOperationException("Cannot peek at an item from an empty queue.");
+
+    public bool TryPeek([NotNullWhen(true)] out T? item)
+    {
+        foreach (var bucket in _buckets)
+        {
+            if (bucket.TryPeek(out item)) { return true; }
+        }
+
+        item = default;
+        return false;
     }
 
     public T Dequeue()
