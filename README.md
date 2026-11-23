@@ -61,6 +61,8 @@ var queue = new BucketedPriorityQueue<string>
 - `Contains` and `Remove` use `EqualityComparer<T>.Default`.
 - Queue-level `Remove` checks buckets in priority order and removes the first matching item.
 - `Dequeue` removes the exact reference selected by the bucket ordering when possible.
+- `Clear` removes all items while retaining the configured buckets.
+- `TryPeek` and `TryDequeue` return `false` when empty; `Peek` and `Dequeue` throw `InvalidOperationException`.
 - Enumerators are fail-fast: a queue or bucket mutation after `GetEnumerator()` causes the next `MoveNext()` to throw `InvalidOperationException`.
 
 ## License

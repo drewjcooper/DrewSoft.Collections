@@ -203,6 +203,30 @@ public class BucketedPriorityQueueTests
     }
 
     [Fact]
+    public void TryPeek_returns_false_and_peek_throws_when_all_buckets_are_empty()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int>() };
+
+        sut.TryPeek(out _).Should().BeFalse();
+        var act = () => sut.Peek();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Cannot peek at an item from an empty queue.");
+    }
+
+    [Fact]
+    public void Peek_skips_empty_buckets()
+    {
+        var sut = new BucketedPriorityQueue<int>
+        {
+            new PriorityBucket<int>(),
+            new PriorityBucket<int> { 42 }
+        };
+
+        sut.Peek().Should().Be(42);
+    }
+
+    [Fact]
     public void Removing_an_item_from_a_bucket_updates_its_count_and_contents()
     {
         var sut = new PriorityBucket<int> { 1, 2, 3 };
@@ -223,6 +247,47 @@ public class BucketedPriorityQueueTests
 
         sut.Should().BeEmpty();
         sut.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Clearing_a_bucket_leaves_items_in_other_buckets_intact()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+
+        first.Clear();
+
+        sut.Should().BeEquivalentTo(new[] { 2 }, opts => opts.WithStrictOrdering());
+        sut.Buckets.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Clearing_the_queue_clears_all_items_but_retains_its_buckets()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+
+        sut.Clear();
+
+        sut.IsEmpty.Should().BeTrue();
+        sut.Buckets.Should().HaveCount(2);
+        first.Add(3);
+        sut.Peek().Should().Be(3);
+    }
+
+    [Fact]
+    public void Moving_an_item_between_buckets_uses_the_destination_order()
+    {
+        var source = new PriorityBucket<string>(Ordering<string>.Fifo) { "move", "stay" };
+        var destination = new PriorityBucket<string>(Ordering<string>.Fifo) { "existing" };
+        var sut = new BucketedPriorityQueue<string> { destination, source };
+
+        source.Remove("move").Should().BeTrue();
+        destination.Add("move");
+
+        sut.Should().BeEquivalentTo(new[] { "existing", "move", "stay" }, opts => opts.WithStrictOrdering());
     }
 
     [Fact]
