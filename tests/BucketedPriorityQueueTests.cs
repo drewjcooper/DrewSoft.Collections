@@ -227,6 +227,33 @@ public class BucketedPriorityQueueTests
     }
 
     [Fact]
+    public void Dequeue_skips_empty_buckets()
+    {
+        var sut = new BucketedPriorityQueue<int>
+        {
+            new PriorityBucket<int>(),
+            new PriorityBucket<int> { 42 }
+        };
+
+        sut.Dequeue().Should().Be(42);
+    }
+
+    [Fact]
+    public void Fifo_and_lifo_ordering_apply_to_items_added_after_bucket_attachment()
+    {
+        var fifo = new PriorityBucket<int>(Ordering<int>.Fifo);
+        var lifo = new PriorityBucket<int>(Ordering<int>.Lifo);
+        var sut = new BucketedPriorityQueue<int> { fifo, lifo };
+
+        fifo.Add(1);
+        fifo.Add(2);
+        lifo.Add(3);
+        lifo.Add(4);
+
+        sut.Should().BeEquivalentTo(new[] { 1, 2, 4, 3 }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
     public void Removing_an_item_from_a_bucket_updates_its_count_and_contents()
     {
         var sut = new PriorityBucket<int> { 1, 2, 3 };
@@ -406,6 +433,19 @@ public class BucketedPriorityQueueTests
         bucket.Ordering = Ordering<int>.Lifo;
 
         sut.Should().BeEquivalentTo(new[] { 2, 1 }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Changed_bucket_order_is_used_by_enumeration_peek_and_dequeue()
+    {
+        var bucket = new PriorityBucket<int> { 1, 3, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+
+        bucket.Ordering = Ordering<int>.By(value => value);
+
+        sut.Should().BeEquivalentTo(new[] { 1, 2, 3 }, opts => opts.WithStrictOrdering());
+        sut.Peek().Should().Be(1);
+        sut.Dequeue().Should().Be(1);
     }
 
     [Fact]
