@@ -224,4 +224,141 @@ public class BucketedPriorityQueueTests
         sut.Should().BeEmpty();
         sut.Count.Should().Be(0);
     }
+
+    [Fact]
+    public void Adding_a_bucket_invalidates_an_existing_enumerator_before_iteration()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Add(new PriorityBucket<int> { 2 });
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        sut.RemoveBucket(bucket).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Adding_an_item_to_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Add(2);
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_an_item_from_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Remove(2).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_an_item_from_the_queue_invalidates_an_existing_enumerator()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Remove(2).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Clearing_the_queue_invalidates_an_existing_enumerator()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Clear();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Changing_bucket_order_invalidates_an_existing_enumerator_before_iteration()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Ordering = Ordering<int>.Lifo;
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void New_enumerator_uses_the_changed_bucket_order()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+
+        bucket.Ordering = Ordering<int>.Lifo;
+
+        sut.Should().BeEquivalentTo(new[] { 2, 1 }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Changing_bucket_priority_invalidates_an_existing_enumerator()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+        var enumerator = sut.GetEnumerator();
+
+        sut.MoveBucket(second, 0).Should().BeTrue();
+        sut.Should().BeEquivalentTo(new[] { 2, 1 }, opts => opts.WithStrictOrdering());
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Changing_the_queue_after_iteration_starts_invalidates_the_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        enumerator.MoveNext().Should().BeTrue();
+        bucket.Add(3);
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
 }

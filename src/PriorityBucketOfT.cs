@@ -8,12 +8,32 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
 {
     private readonly List<T> _items = [];
     private Ordering<T> _bucketOrder = bucketOrder ?? Ordering<T>.Fifo;
+    private long _version;
 
     public int Count => _items.Count;
 
     public bool IsReadOnly => false;
 
-    public void Add(T item) => _items.Add(item);
+    public Ordering<T> Ordering
+    {
+        get => _bucketOrder;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (ReferenceEquals(_bucketOrder, value)) { return; }
+
+            _bucketOrder = value;
+            _version++;
+        }
+    }
+
+    internal long Version => _version;
+
+    public void Add(T item)
+    {
+        _items.Add(item);
+        _version++;
+    }
 
     public T Peek()
         => TryPeek(out var item)
@@ -38,6 +58,7 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
         {
             item = _bucketOrder.Apply(_items).First();
             _items.Remove(item);
+            _version++;
             return true;
         }
 
@@ -45,15 +66,49 @@ public class PriorityBucket<T>(Ordering<T>? bucketOrder = null) : ICollection<T>
         return false;
     }
 
-    public void Clear() => _items.Clear();
+    public void Clear()
+    {
+        if (_items.Count == 0) { return; }
+
+        _items.Clear();
+        _version++;
+    }
 
     public bool Contains(T item) => _items.Contains(item);
 
     public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
 
-    public bool Remove(T item) => _items.Remove(item);
+    public bool Remove(T item)
+    {
+        if (!_items.Remove(item)) { return false; }
 
-    public IEnumerator<T> GetEnumerator() => _bucketOrder.Apply(_items).GetEnumerator();
+        _version++;
+        return true;
+    }
+
+    public IEnumerator<T> GetEnumerator() => GetEnumerator(_version);
+
+    internal IEnumerator<T> GetEnumerator(long expectedVersion)
+        => Enumerate(expectedVersion, _bucketOrder).GetEnumerator();
+
+    private IEnumerable<T> Enumerate(long expectedVersion, Ordering<T> ordering)
+    {
+        EnsureVersion(expectedVersion);
+        foreach (var item in ordering.Apply(_items))
+        {
+            EnsureVersion(expectedVersion);
+            yield return item;
+        }
+        EnsureVersion(expectedVersion);
+    }
+
+    private void EnsureVersion(long expectedVersion)
+    {
+        if (_version != expectedVersion)
+        {
+            throw new InvalidOperationException("The bucket was modified during enumeration.");
+        }
+    }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
