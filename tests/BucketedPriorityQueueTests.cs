@@ -165,4 +165,367 @@ public class BucketedPriorityQueueTests
         result.Should().BeTrue();
         item.Should().Be(1);
     }
+
+    [Fact]
+    public void Queues_expose_total_count_and_empty_state()
+    {
+        var sut = new BucketedPriorityQueue<int>();
+
+        ((object)sut).Should().BeEquivalentTo(new { Count = 0, IsEmpty = true });
+
+        sut.Add(new PriorityBucket<int> { 1, 2 });
+
+        ((object)sut).Should().BeEquivalentTo(new { Count = 2, IsEmpty = false });
+    }
+
+    [Fact]
+    public void Peek_returns_the_next_item_without_removing_it()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+
+        var result = sut.Peek();
+
+        result.Should().Be(1);
+        sut.Count.Should().Be(2);
+        sut.Dequeue().Should().Be(1);
+    }
+
+    [Fact]
+    public void TryPeek_returns_the_next_item_without_removing_it()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+
+        var result = sut.TryPeek(out var item);
+
+        result.Should().BeTrue();
+        item.Should().Be(1);
+        sut.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void TryPeek_returns_false_and_peek_throws_when_all_buckets_are_empty()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int>() };
+
+        sut.TryPeek(out _).Should().BeFalse();
+        var act = () => sut.Peek();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Cannot peek at an item from an empty queue.");
+    }
+
+    [Fact]
+    public void Peek_skips_empty_buckets()
+    {
+        var sut = new BucketedPriorityQueue<int>
+        {
+            new PriorityBucket<int>(),
+            new PriorityBucket<int> { 42 }
+        };
+
+        sut.Peek().Should().Be(42);
+    }
+
+    [Fact]
+    public void Dequeue_skips_empty_buckets()
+    {
+        var sut = new BucketedPriorityQueue<int>
+        {
+            new PriorityBucket<int>(),
+            new PriorityBucket<int> { 42 }
+        };
+
+        sut.Dequeue().Should().Be(42);
+    }
+
+    [Fact]
+    public void Fifo_and_lifo_ordering_apply_to_items_added_after_bucket_attachment()
+    {
+        var fifo = new PriorityBucket<int>(Ordering<int>.Fifo);
+        var lifo = new PriorityBucket<int>(Ordering<int>.Lifo);
+        var sut = new BucketedPriorityQueue<int> { fifo, lifo };
+
+        fifo.Add(1);
+        fifo.Add(2);
+        lifo.Add(3);
+        lifo.Add(4);
+
+        sut.Should().BeEquivalentTo(new[] { 1, 2, 4, 3 }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Removing_an_item_from_a_bucket_updates_its_count_and_contents()
+    {
+        var sut = new PriorityBucket<int> { 1, 2, 3 };
+
+        var result = sut.Remove(2);
+
+        result.Should().BeTrue();
+        sut.Should().BeEquivalentTo(new[] { 1, 3 }, opts => opts.WithStrictOrdering());
+        sut.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Clearing_a_bucket_removes_all_items()
+    {
+        var sut = new PriorityBucket<int> { 1, 2, 3 };
+
+        sut.Clear();
+
+        sut.Should().BeEmpty();
+        sut.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Clearing_a_bucket_leaves_items_in_other_buckets_intact()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+
+        first.Clear();
+
+        sut.Should().BeEquivalentTo(new[] { 2 }, opts => opts.WithStrictOrdering());
+        sut.Buckets.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Clearing_the_queue_clears_all_items_but_retains_its_buckets()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+
+        sut.Clear();
+
+        sut.IsEmpty.Should().BeTrue();
+        sut.Buckets.Should().HaveCount(2);
+        first.Add(3);
+        sut.Peek().Should().Be(3);
+    }
+
+    [Fact]
+    public void Moving_an_item_between_buckets_uses_the_destination_order()
+    {
+        var source = new PriorityBucket<string>(Ordering<string>.Fifo) { "move", "stay" };
+        var destination = new PriorityBucket<string>(Ordering<string>.Fifo) { "existing" };
+        var sut = new BucketedPriorityQueue<string> { destination, source };
+
+        source.Remove("move").Should().BeTrue();
+        destination.Add("move");
+
+        sut.Should().BeEquivalentTo(new[] { "existing", "move", "stay" }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Bucket_and_queue_removal_use_default_equality_and_return_false_when_missing()
+    {
+        var bucket = new PriorityBucket<QueueValue> { new(7, 0) };
+        var sut = new BucketedPriorityQueue<QueueValue> { bucket };
+
+        bucket.Contains(new QueueValue(7, 0)).Should().BeTrue();
+        bucket.Remove(new QueueValue(8, 0)).Should().BeFalse();
+        sut.Remove(new QueueValue(7, 0)).Should().BeTrue();
+        sut.Remove(new QueueValue(7, 0)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Adding_a_bucket_invalidates_an_existing_enumerator_before_iteration()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Add(new PriorityBucket<int> { 2 });
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        sut.RemoveBucket(bucket).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Adding_an_item_to_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Add(2);
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_an_item_from_a_bucket_invalidates_an_existing_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Remove(2).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Removing_an_item_from_the_queue_invalidates_an_existing_enumerator()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Remove(2).Should().BeTrue();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Clearing_the_queue_invalidates_an_existing_enumerator()
+    {
+        var sut = new BucketedPriorityQueue<int> { new PriorityBucket<int> { 1, 2 } };
+        var enumerator = sut.GetEnumerator();
+
+        sut.Clear();
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Changing_bucket_order_invalidates_an_existing_enumerator_before_iteration()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        bucket.Ordering = Ordering<int>.Lifo;
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void New_enumerator_uses_the_changed_bucket_order()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+
+        bucket.Ordering = Ordering<int>.Lifo;
+
+        sut.Should().BeEquivalentTo(new[] { 2, 1 }, opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Changed_bucket_order_is_used_by_enumeration_peek_and_dequeue()
+    {
+        var bucket = new PriorityBucket<int> { 1, 3, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+
+        bucket.Ordering = Ordering<int>.By(value => value);
+
+        sut.Should().BeEquivalentTo(new[] { 1, 2, 3 }, opts => opts.WithStrictOrdering());
+        sut.Peek().Should().Be(1);
+        sut.Dequeue().Should().Be(1);
+    }
+
+    [Fact]
+    public void Changing_bucket_priority_invalidates_an_existing_enumerator()
+    {
+        var first = new PriorityBucket<int> { 1 };
+        var second = new PriorityBucket<int> { 2 };
+        var sut = new BucketedPriorityQueue<int> { first, second };
+        var enumerator = sut.GetEnumerator();
+
+        sut.MoveBucket(second, 0).Should().BeTrue();
+        sut.Should().BeEquivalentTo(new[] { 2, 1 }, opts => opts.WithStrictOrdering());
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Changing_the_queue_after_iteration_starts_invalidates_the_enumerator()
+    {
+        var bucket = new PriorityBucket<int> { 1, 2 };
+        var sut = new BucketedPriorityQueue<int> { bucket };
+        var enumerator = sut.GetEnumerator();
+
+        enumerator.MoveNext().Should().BeTrue();
+        bucket.Add(3);
+
+        var act = () => enumerator.MoveNext();
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Key_based_ordering_preserves_enqueue_order_for_equal_keys()
+    {
+        var bucket = new PriorityBucket<(int Priority, string Name)>(
+            Ordering<(int Priority, string Name)>.By(item => item.Priority))
+        {
+            (2, "first"),
+            (1, "middle"),
+            (2, "second")
+        };
+        var sut = new BucketedPriorityQueue<(int Priority, string Name)> { bucket };
+
+        sut.Should().BeEquivalentTo(
+            new[] { (1, "middle"), (2, "first"), (2, "second") },
+            opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Dequeue_removes_the_exact_item_selected_by_custom_ordering_when_items_compare_equal()
+    {
+        var firstAdded = new QueueValue(7, 2);
+        var orderedFirst = new QueueValue(7, 1);
+        var bucket = new PriorityBucket<QueueValue>(Ordering<QueueValue>.By(item => item.Priority))
+        {
+            firstAdded,
+            orderedFirst
+        };
+        var sut = new BucketedPriorityQueue<QueueValue> { bucket };
+
+        sut.Dequeue().Should().BeSameAs(orderedFirst);
+
+        sut.Should().ContainSingle().Which.Should().BeSameAs(firstAdded);
+    }
+
+    private sealed class QueueValue
+    {
+        public QueueValue(int id, int priority)
+        {
+            Id = id;
+            Priority = priority;
+        }
+
+        public int Id { get; }
+        public int Priority { get; }
+
+        public override bool Equals(object? obj) => obj is QueueValue other && Id == other.Id;
+
+        public override int GetHashCode() => Id.GetHashCode();
+    }
 }
